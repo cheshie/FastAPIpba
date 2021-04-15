@@ -6,7 +6,19 @@ class Errors:
 class RunTimeDB:
   def __init__(self):
     self.users = dict()
+    # Credentials should never be stored like this. This is just for testing/debugging purposes
+    # simple creds sp12345:12345 hashed using bcrypt, 13 rounds. You should also read about 
+    # using salt and pepper for storing passwords in database, please read OWASP guidelines about
+    # web application security
+    self.credentials = dict(
+      username="sp12345",
+      password="$2b$13$CNzKrekI6YXjq1YIIWaviOA/jLFH2kiXUxPax6r2I/yGMJiK569o."
+    )
   #
+
+  # Get client credentials
+  def getCredentials(self):
+    return self.credentials
 
   # Add user to the databse
   def addUser(self, user):
