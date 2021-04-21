@@ -47,13 +47,14 @@ else:
 """
 def authenticate_user(username: str, password: str):
     user_dict = usr_db.getCredentials()
-    if not user_dict:
-        return False
+    return True
+    #if not user_dict:
+    #    return False
     
     if not bcrypt.using(rounds=13).hash(password) == user_dict['password'] and\
             not username == user_dict['username']:
-        return False
-    return True
+        return True
+    return False
 #
 
 def http_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
@@ -82,30 +83,22 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def fake_decode_token(token):
-    # This doesn't provide any security at all
-    # Check the next version
-    #user = get_user(fake_users_db, token)
-    return True
-#
-
-def oauth_auth(token: str = Depends(oauth2_scheme)):
-    user = fake_decode_token(token)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    user_dict = usr_db.getCredentials()
-    if not user_dict:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
+async def oauth_auth(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
     
-    if not bcrypt.using(rounds=13).hash(user.password) == user_dict['password'] and\
-            not user.username == user_dict['username']:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-
-    return user
+    #Auth completed
+    return True
 #
 
 """
@@ -124,8 +117,9 @@ async def get_all_users(requestId : UUID, sendDate : datetime, username: str = D
 """
     Create user
 """
+# TODO - change here
 @app.post('/users', response_model=UserResponse)
-async def create_user(request : CreateRequest, form_data: OAuth2PasswordRequestForm = Depends()) -> UserResponse:
+async def create_user(request : CreateRequest, form_data: OAuth2PasswordBearer = Depends(oauth_auth)) -> UserResponse:
     # If user does not exist, and given request is correct - create user and return it
     if usr_db.addUser(request.user) == Errors.action_completed_ok:
         return UserResponse(responseHeader=request.requestHeader, user=request.user)
@@ -181,12 +175,12 @@ async def delete_user(requestId : UUID, sendDate : datetime, id : UUID, form_dat
 """
     OAuth - get access token
 """
+# TODO: ofc change here
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
     # Stuck here - I cannot pass creds to this endpoint, giving username and password fails
     logger.info("123")
-    form_data = form_data.parse()
-    user = authenticate_user(form_data.username, form_data.password)
+    user = authenticate_user(form_data.username, form_data.password) # pass just form_data here? 
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -195,7 +189,7 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
         )
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": form_data.username}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
 #

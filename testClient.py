@@ -90,8 +90,42 @@ def test_delete_user_that_does_not_exist(userId):
     assert response.status_code == 422
 
 
+def get_token(username, password):
+    data = {'username' : username, 'password' : password}
+    response = client.post("/token", data=data)
+    
+    print("[*] Token: ", response.status_code, " Response message: ", response.text)
+    assert response.status_code == 200
+    return response.text
+
+def test_add_user_auth(token, user):
+    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now()))
+    from json import loads
+    response = client.post(
+                "/users", 
+                headers={'Content-Type' : 'application/json', 'Authorization' : 'Bearer '+loads(token)['access_token']},
+                json=dict(requestHeader=requestHeader, user=jsonable_encoder(user)),
+    )
+    print("[*] Adding user returned: ", response.status_code, 'text', response.text)
+    assert response.status_code == 200
+
+
 
 if __name__ == "__main__":
+    userId1 = '92345678-1234-5678-1234-567812345678'
+    usr1 = User(
+      id=userId1, 
+      name="Stefan", 
+      surname="Stefan", 
+      age=99, 
+      personalId="12312312312", 
+      citizenship="PL", 
+      email="stefan@stefan.com"
+    )
+    token = get_token('sp12345', '12345')
+    test_add_user_auth(token, usr1)
+    exit()
+
     userId1 = '12345678-1234-5678-1234-567812345678'
     userId2 = '22345678-1234-5678-1234-567812345678'
     userId3 = '32345678-1234-5678-1234-567812345678'
