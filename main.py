@@ -14,7 +14,9 @@ from models import UserListResponse, UserResponse, User, Stub, RequestHeader,\
 from db import RunTimeDB, Errors
 from datetime import datetime, timedelta
 
-#if __name__ == '__main__':
+# logging in fastapi
+# logger.info(" log text ")
+
 usr_db = RunTimeDB()
 usr1 = User(id='12345678-1234-5678-1234-567812345678', name="Stefan", surname="Stefan", age=99, personalId="12312312312", citizenship="PL", email="stefan@stefan.com")
 usr2 = User(id='22345678-1234-5678-1234-567812345678', name="Stefan", surname="Stefan", age=99, personalId="12312312312", citizenship="PL", email="stefan@stefan.com")
@@ -81,19 +83,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
 async def oauth_auth(token: str = Depends(oauth2_scheme)):
     # TODO: 
     # check if user is okey, if requested content is okay, if public key is okay
+    # Make sure the scope is checked appropriately
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -128,7 +121,7 @@ async def get_all_users(requestId : UUID, sendDate : datetime, username: str = D
     Create user
 """
 @app.post('/users', response_model=UserResponse)
-async def create_user(request : CreateRequest, username: str = Depends(http_basic_auth)) -> UserResponse:
+async def create_user(request : CreateRequest, username: str = Depends(oauth_auth)) -> UserResponse:
     # If user does not exist, and given request is correct - create user and return it
     if usr_db.addUser(request.user) == Errors.action_completed_ok:
         return UserResponse(responseHeader=request.requestHeader, user=request.user)
@@ -186,7 +179,6 @@ async def delete_user(requestId : UUID, sendDate : datetime, id : UUID, form_dat
 """
 @app.post("/token", response_model=Token)
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
-    logger.info("123") # < does it work check? 
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(

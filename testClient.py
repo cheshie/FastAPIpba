@@ -7,6 +7,7 @@ from uuid import uuid4
 from models import User
 from json import loads
 from base64 import b64encode
+from json import loads
 
 client = TestClient(app)
 
@@ -184,10 +185,36 @@ def test_oauth(username, password):
 
     response = client.post("/token", data=body)
 
-    print("[*](Incorrect credentials) Getting list of users returned: ", response.status_code, response.text)
+    print("[*]() Getting token: ", response.status_code)
 
+    # return JWT token as text
+    print('Bearer ' + loads(response.text)['access_token'])
+    return 'Bearer ' + loads(response.text)['access_token']
+
+
+def test_add_user_auth(token, user):
+    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now()))
+    
+    response = client.post(
+                "/users", 
+                headers={'Content-Type' : 'application/json', 'Authorization' : token},
+                json=dict(requestHeader=requestHeader, user=jsonable_encoder(user)),
+    )
+    print("[*] Adding user returned: ", response.status_code, 'text', response.text)
+    assert response.status_code == 200
 
 if __name__ == "__main__":
     #test_api() <= lab4
     #test_basic_auth('sp12345', '12345')
-    test_oauth('sp12345', '12345')
+    userId1 = '12345678-1234-5678-1234-567812345678'
+    usr1 = User(
+      id=userId1, 
+      name="Stefan", 
+      surname="Stefan", 
+      age=99, 
+      personalId="12312312312", 
+      citizenship="PL", 
+      email="stefan@stefan.com"
+    )
+    token = test_oauth('sp12345', '12345')
+    test_add_user_auth(token, usr1)
