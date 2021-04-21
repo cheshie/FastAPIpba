@@ -17,6 +17,11 @@ from datetime import datetime, timedelta
 # logging in fastapi
 # logger.info(" log text ")
 
+# TODO: 
+# * Create database 
+# * Response should have Error structure, look at documentation, swagger not yaml
+# * token should be taken from repository, not generated here
+
 usr_db = RunTimeDB()
 usr1 = User(id='12345678-1234-5678-1234-567812345678', name="Stefan", surname="Stefan", age=99, personalId="12312312312", citizenship="PL", email="stefan@stefan.com")
 usr2 = User(id='22345678-1234-5678-1234-567812345678', name="Stefan", surname="Stefan", age=99, personalId="12312312312", citizenship="PL", email="stefan@stefan.com")

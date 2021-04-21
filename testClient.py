@@ -206,7 +206,7 @@ def test_add_user_auth(token, user):
 if __name__ == "__main__":
     #test_api() <= lab4
     #test_basic_auth('sp12345', '12345')
-    userId1 = '12345678-1234-5678-1234-567812345678'
+    userId1 = '12345675-1234-5678-1234-567812345678'
     usr1 = User(
       id=userId1, 
       name="Stefan", 
