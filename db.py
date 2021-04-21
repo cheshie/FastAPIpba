@@ -1,3 +1,5 @@
+from passlib.hash import bcrypt
+
 class Errors:
   action_completed_ok = 0x00
   error_user_exists = 0x1
@@ -12,7 +14,7 @@ class RunTimeDB:
     # web application security
     self.credentials = dict(
       username="sp12345",
-      password="$2b$13$CNzKrekI6YXjq1YIIWaviOA/jLFH2kiXUxPax6r2I/yGMJiK569o."
+      password=bcrypt.using(rounds=13).hash("12345")
     )
   #
 

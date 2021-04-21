@@ -50,10 +50,9 @@ def authenticate_user(username: str, password: str):
     if not user_dict:
         return False
     
-    if not bcrypt.using(rounds=13).hash(password) == user_dict['password'] and\
-            not username == user_dict['username']:
-        return False
-    return True
+    if  bcrypt.verify(password ,user_dict['password']) and username == user_dict['username']:
+        return True
+    return False
 #
 
 def http_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
@@ -61,7 +60,7 @@ def http_basic_auth(credentials: HTTPBasicCredentials = Depends(security)):
     if not auth_status:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Incorrect username or password",
+            detail="Incorrect username or password : " + credentials.password,
             headers={"WWW-Authenticate": "Basic"},
         )
     return credentials.username
@@ -125,7 +124,7 @@ async def get_all_users(requestId : UUID, sendDate : datetime, username: str = D
     Create user
 """
 @app.post('/users', response_model=UserResponse)
-async def create_user(request : CreateRequest, form_data: OAuth2PasswordRequestForm = Depends()) -> UserResponse:
+async def create_user(request : CreateRequest, username: str = Depends(http_basic_auth)) -> UserResponse:
     # If user does not exist, and given request is correct - create user and return it
     if usr_db.addUser(request.user) == Errors.action_completed_ok:
         return UserResponse(responseHeader=request.requestHeader, user=request.user)
@@ -185,7 +184,6 @@ async def delete_user(requestId : UUID, sendDate : datetime, id : UUID, form_dat
 async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends()) -> Token:
     # Stuck here - I cannot pass creds to this endpoint, giving username and password fails
     logger.info("123")
-    form_data = form_data.parse()
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         raise HTTPException(

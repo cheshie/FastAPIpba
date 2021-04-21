@@ -6,6 +6,7 @@ from datetime import datetime
 from uuid import uuid4
 from models import User
 from json import loads
+from base64 import b64encode
 
 client = TestClient(app)
 
@@ -89,9 +90,7 @@ def test_delete_user_that_does_not_exist(userId):
     print("[*] Removing user that does not exist returned: ", response.status_code, " Response message: ", response.text)
     assert response.status_code == 422
 
-
-
-if __name__ == "__main__":
+def test_api():
     userId1 = '12345678-1234-5678-1234-567812345678'
     userId2 = '22345678-1234-5678-1234-567812345678'
     userId3 = '32345678-1234-5678-1234-567812345678'
@@ -160,3 +159,41 @@ if __name__ == "__main__":
 
     # Delete user that does not exist
     test_delete_user_that_does_not_exist(userId1)
+
+def test_basic_auth(username, password):
+    headers = {
+        'Authorization' : 'Basic ' + b64encode((username + ':' + password).encode()).decode()
+    }
+    response = client.get("/users", params=dict(requestId=str(uuid4()), sendDate=datetime.now()), headers=headers)
+    
+    print("[*](Correct credentials) Getting list of users returned: ", response.status_code)
+    assert response.status_code == 200
+
+    dummypassword = 'dummypassword'
+    headers = {
+        'Authorization' : 'Basic ' + b64encode((username + ':' + dummypassword).encode()).decode()
+    }
+    response = client.get("/users", params=dict(requestId=str(uuid4()), sendDate=datetime.now()), headers=headers)
+    print("[*](Incorrect credentials) Getting list of users returned: ", response.status_code, response.text)
+
+def test_oauth(username, password):
+    # body = dict(
+    #     username=username,
+    #     password=password
+    # )
+    from requests_toolbelt.multipart.encoder import MultipartEncoder
+    m = MultipartEncoder(
+        fields={'username': username,
+                'password' : password
+        }
+        )
+
+    response = client.post("/token", params=dict(requestId=str(uuid4()), sendDate=datetime.now()), data=m)
+
+    print("[*](Incorrect credentials) Getting list of users returned: ", response.status_code, response.text)
+
+
+if __name__ == "__main__":
+    #test_api() <= lab4
+    #test_basic_auth('sp12345', '12345')
+    test_oauth('sp12345', '12345')
