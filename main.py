@@ -121,7 +121,7 @@ async def get_all_users(requestId : UUID, sendDate : datetime, username: str = D
     Create user
 """
 @app.post('/users', response_model=UserResponse)
-async def create_user(request : CreateRequest, username: str = Depends(oauth_auth)) -> UserResponse:
+async def create_user(request : CreateRequest, form_data: OAuth2PasswordBearer = Depends(oauth_auth)) -> UserResponse:
     # If user does not exist, and given request is correct - create user and return it
     if usr_db.addUser(request.user) == Errors.action_completed_ok:
         return UserResponse(responseHeader=request.requestHeader, user=request.user)
