@@ -177,18 +177,12 @@ def test_basic_auth(username, password):
     print("[*](Incorrect credentials) Getting list of users returned: ", response.status_code, response.text)
 
 def test_oauth(username, password):
-    # body = dict(
-    #     username=username,
-    #     password=password
-    # )
-    from requests_toolbelt.multipart.encoder import MultipartEncoder
-    m = MultipartEncoder(
-        fields={'username': username,
-                'password' : password
-        }
-        )
+    body = {
+        'username' : username,
+        'password' : password
+    }
 
-    response = client.post("/token", params=dict(requestId=str(uuid4()), sendDate=datetime.now()), data=m)
+    response = client.post("/token", data=body)
 
     print("[*](Incorrect credentials) Getting list of users returned: ", response.status_code, response.text)
 
