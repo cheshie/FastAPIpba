@@ -81,30 +81,34 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def fake_decode_token(token):
-    # This doesn't provide any security at all
-    # Check the next version
-    #user = get_user(fake_users_db, token)
-    return True
-#
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
 
-def oauth_auth(token: str = Depends(oauth2_scheme)):
-    user = fake_decode_token(token)
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    user_dict = usr_db.getCredentials()
-    if not user_dict:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
+async def oauth_auth(token: str = Depends(oauth2_scheme)):
+    # TODO: 
+    # check if user is okey, if requested content is okay, if public key is okay
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
     
-    if not bcrypt.using(rounds=13).hash(user.password) == user_dict['password'] and\
-            not user.username == user_dict['username']:
-        raise HTTPException(status_code=400, detail="Incorrect username or password")
-
-    return user
+    #Auth completed
+    return True
 #
 
 """
