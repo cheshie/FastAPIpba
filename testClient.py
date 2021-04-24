@@ -8,6 +8,7 @@ from models import User
 from json import loads
 from base64 import b64encode
 from json import loads
+from requests import request
 
 client = TestClient(app)
 
@@ -185,12 +186,31 @@ def test_oauth(username, password):
 
     response = client.post("/token", data=body)
 
+    assert response.status_code == 200
     print("[*]() Getting token: ", response.status_code)
 
     # return JWT token as text
-    print('Bearer ' + loads(response.text)['access_token'])
     return 'Bearer ' + loads(response.text)['access_token']
+#
 
+def test_oauth_external():
+    creds = loads(open('tokensecret.json', 'r').read())
+    creds = creds['username'] + ':' + creds['password']
+    headers = {
+        'Authorization' : 'Basic ' + b64encode(creds.encode()).decode()
+    }
+
+    response = request(
+        'POST',
+        'https://pba-auth-server.herokuapp.com/oauth/token',
+        data={"grant_type":"client_credentials"}, 
+        headers=headers
+    )
+
+    assert response.status_code == 200
+    print("[*]() Getting token: ", response.status_code)
+    return loads(response.text)['access_token']
+#
 
 def test_add_user_auth(token, user):
     requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now()))
@@ -200,12 +220,23 @@ def test_add_user_auth(token, user):
                 headers={'Content-Type' : 'application/json', 'Authorization' : token},
                 json=dict(requestHeader=requestHeader, user=jsonable_encoder(user)),
     )
-    print("[*] Adding user returned: ", response.status_code, 'text', response.text)
+    print("[*] Adding user returned: ", response.status_code)
     assert response.status_code == 200
 
-if __name__ == "__main__":
-    #test_api() <= lab4
+def test_api_auth():
     #test_basic_auth('sp12345', '12345')
+    userId1 = '12345675-1234-5678-1234-111112345678'
+    username='sp12345'
+    password='12345'
+    headers = {
+        'Authorization' : 'Basic ' + b64encode((username + ':' + password).encode()).decode()
+    }
+    response = client.get(f"/users/{userId1}", 
+            params=dict(requestId=str(uuid4()), 
+            sendDate=datetime.now()),
+            headers=headers
+        )
+    exit()
     userId1 = '12345675-1234-5678-1234-567812345678'
     usr1 = User(
       id=userId1, 
@@ -218,3 +249,9 @@ if __name__ == "__main__":
     )
     token = test_oauth('sp12345', '12345')
     test_add_user_auth(token, usr1)
+
+if __name__ == "__main__":
+    #test_api() <= lab4
+    test_api_auth()
+
+
