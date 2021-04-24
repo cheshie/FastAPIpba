@@ -9,6 +9,7 @@ from json import loads
 from base64 import b64encode
 from json import loads
 from requests import request
+from time import sleep
 
 client = TestClient(app)
 
@@ -212,7 +213,7 @@ def test_oauth_external():
     return loads(response.text)['access_token']
 #
 
-def test_add_user_auth(token, user):
+def test_add_user_auth(token, user, expected_response=200):
     requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now()))
     
     response = client.post(
@@ -220,23 +221,14 @@ def test_add_user_auth(token, user):
                 headers={'Content-Type' : 'application/json', 'Authorization' : token},
                 json=dict(requestHeader=requestHeader, user=jsonable_encoder(user)),
     )
-    print("[*] Adding user returned: ", response.status_code)
-    assert response.status_code == 200
+    print("[*] Adding user returned: ", response.status_code, " response text: ", response.text)
+    assert response.status_code == expected_response
 
 def test_api_auth():
     #test_basic_auth('sp12345', '12345')
-    userId1 = '12345675-1234-5678-1234-111112345678'
-    username='sp12345'
-    password='12345'
-    headers = {
-        'Authorization' : 'Basic ' + b64encode((username + ':' + password).encode()).decode()
-    }
-    response = client.get(f"/users/{userId1}", 
-            params=dict(requestId=str(uuid4()), 
-            sendDate=datetime.now()),
-            headers=headers
-        )
-    exit()
+    #exit()
+    
+    # Test data
     userId1 = '12345675-1234-5678-1234-567812345678'
     usr1 = User(
       id=userId1, 
@@ -247,11 +239,20 @@ def test_api_auth():
       citizenship="PL", 
       email="stefan@stefan.com"
     )
+    usr2 = usr1.copy()
+    usr2.id = '12345675-1234-5678-1234-567812345111'
+
+    # Get token
     token = test_oauth('sp12345', '12345')
-    test_add_user_auth(token, usr1)
+    # Add user - ok
+    test_add_user_auth(token, usr1, expected_response=200)
+    sleep(30)
+    print("[*] 30 seconds passed.")
+    # After token expiry - response should be unauthorized
+    test_add_user_auth(token, usr2, expected_response=401)
 
 if __name__ == "__main__":
     #test_api() <= lab4
-    test_api_auth()
+    test_api_auth() # lab5
 
 

@@ -145,8 +145,8 @@ async def create_user(request : CreateRequest, form_data: OAuth2PasswordBearer =
         raise UnicornException(
             code="USER_ALREADY_EXISTS",
             message="Resource doesn't exist",
-            requestId=str(request.requestId), 
-            sendDate=str(request.sendDate), 
+            requestId=str(request.requestHeader.requestId), 
+            sendDate=str(request.requestHeader.sendDate), 
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
         )
 #   
@@ -184,8 +184,8 @@ async def update_user(updateRequest : UpdateRequest, id : UUID, form_data: OAuth
             raise UnicornException(
             code="NOT_FOUND",
             message="Resource doesn't exist",
-            requestId=str(updateRequest.requestId), 
-            sendDate=str(updateRequest.sendDate), 
+            requestId=str(updateRequest.requestHeader.requestId), 
+            sendDate=str(updateRequest.requestHeader.sendDate), 
             status_code=status.HTTP_404_NOT_FOUND
         )
         return UserResponse(responseHeader=updateRequest.requestHeader, user=usr_db.modifyUser(updateRequest.user))
@@ -193,8 +193,8 @@ async def update_user(updateRequest : UpdateRequest, id : UUID, form_data: OAuth
         raise UnicornException(
             code="DIFFERENT_ID_IN_PATH_AND_USER",
             message="Resource doesn't exist",
-            requestId=str(updateRequest.requestId), 
-            sendDate=str(updateRequest.sendDate), 
+            requestId=str(updateRequest.requestHeader.requestId), 
+            sendDate=str(updateRequest.requestHeader.sendDate), 
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
         )
 #
