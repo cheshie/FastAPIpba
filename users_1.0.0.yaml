@@ -1,0 +1,335 @@
+swagger: "2.0" 
+info: 
+  description: Specification of the CRUD interface
+  version: '1.0.0' 
+  title: "Users CRUD interface"
+basePath: "/api" 
+tags: 
+  - name: users 
+    description: Users management operations (CRUD).
+schemes: 
+  - "http" 
+  
+paths: 
+  /users: 
+    post: 
+      tags: 
+        - "users" 
+      summary: "Create" 
+      security: 
+        - basicAuth: [] 
+      description: "Create new user" 
+      operationId: "createUser" 
+      produces: 
+        - "application/json" 
+      parameters: 
+        - in: "body" 
+          name: "body" 
+          description: "User object that has to be added" 
+          required: true 
+          schema: 
+            $ref: "#/definitions/CreateRequest" 
+        - name: X-HMAC-SIGNATURE
+          in: header
+          description: integrity verifiaction
+          required: true
+          type: string
+      responses: 
+        "201": 
+          description: "User created successfully" 
+          schema: 
+            $ref: "#/definitions/UserResponse"
+        "400": 
+          description: "Bad request" 
+          schema:
+              $ref: "#/definitions/Error"
+        "401":
+            description: "Unauthorized"
+            schema:
+              $ref: "#/definitions/Error"
+        "422":
+            description: "Unprocessable entity. Codes: USER_ALREADY_EXISTS"
+            schema:
+              $ref: "#/definitions/Error"
+    get: 
+      tags: 
+        - "users" 
+      summary: "Get users list" 
+      security: 
+        - basicAuth: [ ] 
+      description: "Gets all users data" 
+      operationId: "getAllUsers" 
+      produces: 
+        - "application/json" 
+      responses: 
+        "200": 
+          description: "Success" 
+          schema:
+            $ref: "#/definitions/UserListResponse" 
+        "400": 
+          description: "Bad request" 
+          schema:
+              $ref: "#/definitions/Error"
+        "401":
+            description: "Unauthorized"
+            schema:
+              $ref: "#/definitions/Error"
+        "422":
+            description: "Unprocessable entity. Codes: USER_ALREADY_EXISTS"
+            schema:
+              $ref: "#/definitions/Error"
+  /users/{id}: 
+    get: 
+      tags: 
+        - "users" 
+      summary: "Get user" 
+      security: 
+        - basicAuth: [ ] 
+      description: "Gets specified user data" 
+      operationId: "getUserById" 
+      produces: 
+        - "application/json" 
+      parameters: 
+        - name: id 
+          in: path
+          required: true 
+          type: string
+          format: uuid 
+      responses: 
+        "200": 
+          description: "Success" 
+          schema: 
+            $ref: "#/definitions/UserResponse" 
+        "400": 
+          description: "Bad request" 
+          schema:
+              $ref: "#/definitions/Error"
+        "401":
+            description: "Unauthorized"
+            schema:
+              $ref: "#/definitions/Error"
+        "404": 
+          description: "User not found" 
+          schema:
+              $ref: "#/definitions/Error"
+        "422":
+            description: "Unprocessable entity. Codes: USER_ALREADY_EXISTS"
+            schema:
+              $ref: "#/definitions/Error"
+    put: 
+      tags: 
+        - "users" 
+      summary: "Update user"
+      security: 
+        - bearerAuth: [ ] 
+      description: "Update user data" 
+      operationId: "updateUser" 
+      produces: 
+        - "application/json" 
+      parameters: 
+        - name: id 
+          in: path
+          required: true 
+          type: string
+          format: uuid 
+        - in: "body" 
+          name: "body" 
+          required: true 
+          schema: 
+            $ref: "#/definitions/UpdateRequest" 
+        - name: X-JWS-SIGNATURE
+          in: header
+          description: integrity verifiaction
+          required: true
+          type: string
+      responses: 
+        "200": 
+          description: "Success" 
+          schema: 
+            $ref: "#/definitions/UserResponse" 
+        "400": 
+          description: "Bad request" 
+          schema:
+              $ref: "#/definitions/Error"
+        "401":
+            description: "Unauthorized"
+            schema:
+              $ref: "#/definitions/Error"
+        "404": 
+          description: "User not found" 
+          schema:
+              $ref: "#/definitions/Error"
+        "422":
+            description: "Unprocessable entity."
+            schema:
+              $ref: "#/definitions/Error"
+    delete: 
+      tags: 
+        - "users" 
+      summary: "Delete user" 
+      security: 
+        - bearerAuth: [ ] 
+      description: "Removes user" 
+      operationId: "deleteUser" 
+      produces: 
+        - "application/json" 
+      parameters: 
+        - name: id 
+          in: path
+          required: true 
+          type: string
+          format: uuid 
+      responses: 
+        "204": 
+          description: "No content" 
+        "400": 
+          description: "Bad request" 
+          schema:
+              $ref: "#/definitions/Error"
+        "401":
+            description: "Unauthorized"
+            schema:
+              $ref: "#/definitions/Error"
+        "404": 
+          description: "User not found" 
+          schema:
+              $ref: "#/definitions/Error"
+        "422":
+            description: "Unprocessable entity."
+            schema:
+              $ref: "#/definitions/Error"
+
+securityDefinitions: 
+  basicAuth: 
+    type: basic 
+  bearerAuth: 
+    type: apiKey 
+    name: "Bearer" 
+    in: "header" 
+definitions: 
+  User: 
+    type: "object" 
+    required: 
+      - name 
+      - surname 
+      - age
+      - personalId
+      - citizenship 
+    properties: 
+      id:
+        type: string
+        format: uuid 
+      name: 
+        type: "string"
+        example: "Elon" 
+      surname: 
+        type: "string" 
+        example: "Musk"
+      age: 
+        type: "integer" 
+        example: 10 
+        minimum: 1
+      personalId: 
+        type: "string" 
+        example: "92011165987"
+        pattern: '^[0-9]{11}$'
+      citizenship: 
+        type: "string" 
+        example: "PL" 
+        pattern: '^[A-Z]{2}$'
+        enum: 
+          - "PL" 
+          - "DE" 
+          - "UK" 
+      email: 
+        type: "string" 
+        example: "e_musk@gmail.com" 
+        pattern: '^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$' 
+    xml: 
+      name: "User" 
+  Error: 
+    type: "object" 
+    required: 
+      - responseHeader 
+      - code
+    properties: 
+      responseHeader:
+        $ref: "#/definitions/ResponseHeader" 
+      code: 
+        type: "string" 
+        example: "NOT_FOUND"
+      message:
+        type: "string"
+        example: "Resource doesn't exist" 
+  RequestHeader:
+    type: "object" 
+    required: 
+      - requestId 
+      - sendDate
+    properties: 
+      requestId: 
+        type: "string"
+        format: uuid 
+      sendDate: 
+        type: "string"
+        format: date-time
+        example: "2020-11-17T12:08:56.235-0100" 
+        description: "Date format according to ISO_8601 for example: yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+  ResponseHeader:
+    type: "object" 
+    required: 
+      - requestId 
+      - sendDate
+    properties: 
+      requestId: 
+        type: "string"
+        format: uuid 
+      sendDate: 
+        type: "string"
+        format: date-time
+        example: "2020-11-17T12:08:56.235-0100" 
+        description: "Date format according to ISO_8601 for example: yyyy-MM-dd'T'HH:mm:ss.SSSZ"
+    
+  CreateRequest: 
+    type: "object" 
+    required: 
+      - "requestHeader" 
+      - "user" 
+    properties: 
+      requestHeader:
+        $ref: "#/definitions/RequestHeader"
+      user: 
+        $ref: "#/definitions/User" 
+  UpdateRequest: 
+    type: "object" 
+    required: 
+      - "requestHeader" 
+      - "user" 
+    properties: 
+      requestHeader:
+       $ref: "#/definitions/RequestHeader"
+      user:
+        $ref: "#/definitions/User" 
+  
+  UserResponse: 
+    type: "object" 
+    required: 
+      - "responseHeader" 
+      - "user" 
+    properties: 
+      responseHeader:
+        $ref: "#/definitions/RequestHeader"
+      user: 
+        $ref: "#/definitions/User"
+  UserListResponse: 
+    type: "object" 
+    required: 
+      - "responseHeader" 
+      - "usersList" 
+    properties: 
+      responseHeader:
+        $ref: "#/definitions/RequestHeader"
+      usersList:
+        type: array
+        items:  
+          $ref: "#/definitions/User"
