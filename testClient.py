@@ -7,9 +7,12 @@ from uuid import uuid4
 from models import User
 from json import loads
 from base64 import b64encode
-from json import loads
 from requests import request
+from jose import jws
 from time import sleep
+import hmac
+from hashlib import sha256
+from binascii import hexlify
 
 client = TestClient(app)
 
@@ -17,7 +20,7 @@ client = TestClient(app)
 # Correct scenarios # # # # # #
 # Add user
 def test_add_user(user):
-    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now()))
+    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now().isoformat()))
     response = client.post(
                 "/users", 
                 headers={'Content-Type' : 'application/json' },
@@ -28,7 +31,7 @@ def test_add_user(user):
 
 # Check if there is enough users in db
 def test_get_list_of_users(numberOfAddedUsers):
-    response = client.get("/users", params=dict(requestId=str(uuid4()), sendDate=datetime.now()))
+    response = client.get("/users", params=dict(requestId=str(uuid4()), sendDate=datetime.now().isoformat()))
     print("[*] Getting list of users returned: ", response.status_code)
     assert response.status_code == 200
     # 3 users added successfully
@@ -37,13 +40,13 @@ def test_get_list_of_users(numberOfAddedUsers):
 
 # Check if specific user exists in db
 def test_get_specific_user(userId):
-    response = client.get(f"/users/{userId}", params=dict(requestId=str(uuid4()), sendDate=datetime.now()))
+    response = client.get(f"/users/{userId}", params=dict(requestId=str(uuid4()), sendDate=datetime.now().isoformat()))
     print("[*] Getting specific user returned: ", response.status_code )
     assert response.status_code == 200
 
 # Check if test is able to modify specific user and new user name (returned) is as expected
 def test_modify_specific_user(newUser, userId, newName):
-    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now()))
+    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now().isoformat()))
     response = client.put(
                 f"/users/{userId}", 
                 headers={'Content-Type' : 'application/json' },
@@ -55,7 +58,7 @@ def test_modify_specific_user(newUser, userId, newName):
 
 # Test if able to delete specific user
 def test_delete_specific_user(userId):
-    response = client.delete(f"/users/{userId}", params=dict(requestId=str(uuid4()), sendDate=datetime.now()))
+    response = client.delete(f"/users/{userId}", params=dict(requestId=str(uuid4()), sendDate=datetime.now().isoformat()))
     print("[*] Removing specific user returned: ", response.status_code)
     assert response.status_code == 200
 # Correct scenarios # # # # # #
@@ -63,7 +66,7 @@ def test_delete_specific_user(userId):
 # Incorrect scenarios # # # # # #
 # Add user that already exists
 def test_add_user_already_exists(user):
-    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now()))
+    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now().isoformat()))
     response = client.post(
                 "/users", 
                 headers={'Content-Type' : 'application/json' },
@@ -74,12 +77,12 @@ def test_add_user_already_exists(user):
 
 # Get user with ID that does not exist in db
 def test_get_user_does_not_exist(userId):
-    response = client.get(f"/users/{userId}", params=dict(requestId=str(uuid4()), sendDate=datetime.now()))
+    response = client.get(f"/users/{userId}", params=dict(requestId=str(uuid4()), sendDate=datetime.now().isoformat()))
     print("[*] Getting user that does not exist returned: ", response.status_code, " Response message: ", response.text)
     assert response.status_code == 422
 
 def test_modify_user_does_not_exist(newUser, userId):
-    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now()))
+    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now().isoformat()))
     response = client.put(
                 f"/users/{userId}", 
                 headers={'Content-Type' : 'application/json' },
@@ -89,7 +92,7 @@ def test_modify_user_does_not_exist(newUser, userId):
     assert response.status_code == 422
 
 def test_delete_user_that_does_not_exist(userId):
-    response = client.delete(f"/users/{userId}", params=dict(requestId=str(uuid4()), sendDate=datetime.now()))
+    response = client.delete(f"/users/{userId}", params=dict(requestId=str(uuid4()), sendDate=datetime.now().isoformat()))
     print("[*] Removing user that does not exist returned: ", response.status_code, " Response message: ", response.text)
     assert response.status_code == 422
 
@@ -167,7 +170,7 @@ def test_basic_auth(username, password):
     headers = {
         'Authorization' : 'Basic ' + b64encode((username + ':' + password).encode()).decode()
     }
-    response = client.get("/users", params=dict(requestId=str(uuid4()), sendDate=datetime.now()), headers=headers)
+    response = client.get("/users", params=dict(requestId=str(uuid4()), sendDate=datetime.now().isoformat()), headers=headers)
     
     print("[*](Correct credentials) Getting list of users returned: ", response.status_code)
     assert response.status_code == 200
@@ -176,7 +179,7 @@ def test_basic_auth(username, password):
     headers = {
         'Authorization' : 'Basic ' + b64encode((username + ':' + dummypassword).encode()).decode()
     }
-    response = client.get("/users", params=dict(requestId=str(uuid4()), sendDate=datetime.now()), headers=headers)
+    response = client.get("/users", params=dict(requestId=str(uuid4()), sendDate=datetime.now().isoformat()), headers=headers)
     print("[*](Incorrect credentials) Getting list of users returned: ", response.status_code, response.text)
 
 def test_oauth(username, password):
@@ -214,7 +217,7 @@ def test_oauth_external():
 #
 
 def test_add_user_auth(token, user, expected_response=200):
-    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now()))
+    requestHeader=dict(requestId=str(uuid4()), sendDate=str(datetime.now().isoformat()))
     
     response = client.post(
                 "/users", 
@@ -251,8 +254,69 @@ def test_api_auth():
     # After token expiry - response should be unauthorized
     test_add_user_auth(token, usr2, expected_response=401)
 
+# Signature tests - lab6
+def test_signature_integrity_hmac():
+
+    # Create test user and auth data
+    token = test_oauth('sp12345', '12345')
+    xjwssig_pass = 'secret123456'
+    newUserId= str(uuid4())
+    usr1 = User(
+      id=newUserId, 
+      name="Stefan", 
+      surname="Stefan", 
+      age=99, 
+      personalId="12312312312", 
+      citizenship="PL", 
+      email="stefan@stefan.com"
+    )
+    
+    # Send request to create user
+    rh  =dict(requestId=str(uuid4()), sendDate=str(datetime.now().isoformat()))
+    requestBody    = dict(requestHeader=rh, user=jsonable_encoder(usr1))
+    hmacSig = hmac.new(xjwssig_pass.encode(), str(requestBody).encode(), digestmod=sha256)
+    
+    requestHeaders = {'Content-Type' : 'application/json', 
+                      'Authorization' : token,
+                      'X-HMAC-SIGNATURE' : hmacSig.hexdigest()}
+    
+    response = client.post(
+                "/users", 
+                headers=requestHeaders,
+                json=requestBody,
+
+    )
+    
+    print("[*] HMAC Verified. User added successfully. Code: ", response.status_code)
+    assert response.status_code == 200
+    
+    
+    # Send request to modify user
+    # Patch user
+    rh  = dict(requestId=str(uuid4()), sendDate=str(datetime.now().isoformat()))
+    requestBody  = requestBody    = dict(requestHeader=rh, user=jsonable_encoder(usr1))
+    signed = jws.sign(requestBody, xjwssig_pass, algorithm='HS256')
+    requestHeaders = {'Content-Type' : 'application/json', 
+                      'Authorization' : token,
+                      'X-JWS-SIGNATURE' : signed}
+
+    response = client.put(
+                f"/users/{newUserId}", 
+                headers=requestHeaders,
+                json=requestBody
+    )
+    print("[*] JWS Verified. User modified successfully. Code: ", response.status_code)
+    assert response.status_code == 200
+    #
+#
+    
+
+
+
+
 if __name__ == "__main__":
-    #test_api() <= lab4
-    test_api_auth() # lab5
+    # test_api()        <= lab4
+    # test_api_auth()   <= lab5
+    test_signature_integrity_hmac()
 
 

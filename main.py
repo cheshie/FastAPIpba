@@ -1,13 +1,14 @@
 from __future__ import annotations
 from uuid import UUID
-from fastapi import FastAPI, Response, status, HTTPException, Depends
+from fastapi.encoders import jsonable_encoder
+from fastapi import FastAPI, Response, status, HTTPException, Depends, Header
 from fastapi.security import HTTPBasic, HTTPBasicCredentials, OAuth2PasswordBearer,\
  OAuth2PasswordRequestForm
 import secrets
 from passlib.hash import bcrypt
 from passlib.context import CryptContext
-from jose import JWTError, jwt
-from jose.exceptions import ExpiredSignatureError
+from jose import JWTError, jwt, jws
+from jose.exceptions import ExpiredSignatureError, JWSError
 from models import UserListResponse, UserResponse, User, Stub, RequestHeader,\
     CreateRequest, ResponseHeader, UpdateRequest,\
     SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES, Token, INTERNAL, EXTERNAL,\
@@ -15,10 +16,13 @@ from models import UserListResponse, UserResponse, User, Stub, RequestHeader,\
              CredentialsExceptionBasic, UnicornException
 from db import RunTimeDB, Errors
 from datetime import datetime, timedelta
-from json import loads
+from json import loads, dumps
 from requests import request
 from base64 import b64encode
 from fastapi.responses import JSONResponse
+import hmac 
+import hashlib
+from hashlib import sha256
 
 usr_db = RunTimeDB()
 usr1 = User(id='12345678-1234-5678-1234-567812345678', name="Stefan", surname="Stefan", age=99, personalId="12312312312", citizenship="PL", email="stefan@stefan.com")
@@ -41,6 +45,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
 # giving access to external token generation service
 tokensecretfile = 'tokensecret.json'
 external_token_url = 'https://pba-auth-server.herokuapp.com/oauth/token'
+xjwssig_pass = 'secret123456'
 
 """
     Exception handling
@@ -120,6 +125,30 @@ async def oauth_auth(token: str = Depends(oauth2_scheme)):
 #
 
 """
+    Integrity : HMAC and JWS
+"""
+def verify_jws(X_JWS_SIGNATURE:str):
+    try: 
+        jws.verify(X_JWS_SIGNATURE, xjwssig_pass, algorithms=['HS256'])
+    except JWSError:
+        return False
+    return True
+#
+
+def verify_hmac(X_HMAC_SIGNATURE:str, request):
+    raw_request = str(jsonable_encoder(request))
+    generated_sig = hmac.new(
+            xjwssig_pass.encode(), 
+            raw_request.encode(), 
+            digestmod=sha256).hexdigest()
+
+    if hmac.compare_digest(X_HMAC_SIGNATURE, generated_sig):
+        return True
+    return False
+#
+
+
+"""
     ================== ENDPOINTS ====================
 """
 
@@ -136,7 +165,17 @@ async def get_all_users(requestId : UUID, sendDate : datetime, username: str = D
     Create user
 """
 @app.post('/users', response_model=UserResponse)
-async def create_user(request : CreateRequest, form_data: OAuth2PasswordBearer = Depends(oauth_auth)) -> UserResponse:
+async def create_user(request : CreateRequest, X_HMAC_SIGNATURE: str = Header(None), form_data: OAuth2PasswordBearer = Depends(oauth_auth)) -> UserResponse:
+    # Verify that the request has not been tampered with
+    if not verify_hmac(X_HMAC_SIGNATURE, request):
+        raise UnicornException(
+            code="INTEGRITY_ERROR",
+            message="Could not verify integrity of the request",
+            requestId=str(request.requestHeader.requestId), 
+            sendDate=str(request.requestHeader.sendDate), 
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+
     # If user does not exist, and given request is correct - create user and return it
     if usr_db.addUser(request.user) == Errors.action_completed_ok:
         return UserResponse(responseHeader=request.requestHeader, user=request.user)
@@ -176,7 +215,17 @@ async def get_user_by_id(requestId : UUID, sendDate : datetime, id : UUID, usern
     Update user
 """
 @app.put('/users/{id}', response_model=UserResponse)
-async def update_user(updateRequest : UpdateRequest, id : UUID, form_data: OAuth2PasswordRequestForm = Depends()) -> UserResponse:
+async def update_user(updateRequest : UpdateRequest, id : UUID, X_JWS_SIGNATURE: str = Header(None), form_data: OAuth2PasswordBearer = Depends(oauth_auth)) -> UserResponse:    
+    # Verify that request has not been tampered with
+    if not verify_jws(X_JWS_SIGNATURE):
+        raise UnicornException(
+            code="INTEGRITY_ERROR",
+            message="Could not verify integrity of the request",
+            requestId=str(updateRequest.requestHeader.requestId), 
+            sendDate=str(updateRequest.requestHeader.sendDate), 
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY
+        )
+    
     # id given in the path and sent in user object must be the same. Otherwise, return error
     if id == updateRequest.user.id:
         user = usr_db.modifyUser(updateRequest.user) 
