@@ -289,6 +289,27 @@ def test_signature_integrity_hmac():
     
     print("[*] HMAC Verified. User added successfully. Code: ", response.status_code)
     assert response.status_code == 200
+
+    # Send request to create user
+    rh  =dict(requestId=str(uuid4()), sendDate=str(datetime.now().isoformat()))
+    requestBody    = dict(requestHeader=rh, user=jsonable_encoder(usr1))
+    hmacSig = hmac.new(xjwssig_pass.encode(), str(requestBody).encode(), digestmod=sha256)
+    # Modifying the signature to receive verification error
+    modifiedSig = hmacSig.hexdigest().replace('A', 'E').replace('1', '5').replace('3', '9')
+    
+    requestHeaders = {'Content-Type' : 'application/json', 
+                      'Authorization' : token,
+                      'X-HMAC-SIGNATURE' : modifiedSig}
+    
+    response = client.post(
+                "/users", 
+                headers=requestHeaders,
+                json=requestBody,
+
+    )
+
+    print("[*] Sending modified signature (HMAC). Should receive verification error Code: ", response.status_code, ' Response: ', response.text)
+    assert response.status_code == 422
     
     
     # Send request to modify user
@@ -307,6 +328,26 @@ def test_signature_integrity_hmac():
     )
     print("[*] JWS Verified. User modified successfully. Code: ", response.status_code)
     assert response.status_code == 200
+    #
+
+    # Send request to modify user
+    # Patch user
+    rh  = dict(requestId=str(uuid4()), sendDate=str(datetime.now().isoformat()))
+    requestBody  = requestBody    = dict(requestHeader=rh, user=jsonable_encoder(usr1))
+    signed = jws.sign(requestBody, xjwssig_pass, algorithm='HS256')
+    # Modifying valid signature to simulate veirifcation error
+    signed_modified = signed.replace('a', 'e').replace('1', '3').replace('b', 'c').replace('p', 'u')
+    requestHeaders = {'Content-Type' : 'application/json', 
+                      'Authorization' : token,
+                      'X-JWS-SIGNATURE' : signed_modified}
+
+    response = client.put(
+                f"/users/{newUserId}", 
+                headers=requestHeaders,
+                json=requestBody
+    )
+    print("[*] Sending modified singature (JWS). Should receive verification error. Code: ", response.status_code)
+    assert response.status_code == 422
     #
 #
     
